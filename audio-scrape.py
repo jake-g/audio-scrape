@@ -22,8 +22,6 @@ from urllib import quote_plus
 # TODO Soundcloud searching too
 
 
-
-
 # Defaults
 default_playlist = 'urls.txt'
 default_path = '/Users/jake/Google Drive/Music/Dj/unsorted/'
