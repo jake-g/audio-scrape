@@ -25,7 +25,7 @@ from urllib import quote_plus
 # Defaults
 default_playlist = 'urls.txt'
 default_path = '/Users/jake/Google Drive/Music/Dj/unsorted/'
-default_path = "C:\Users\jake\Google Drive\\"
+# default_path = "C:\Users\jake\Google Drive\\"
 
 
 def download_playlist(playlist):
@@ -41,9 +41,7 @@ def download_playlist(playlist):
 
 
 # Downloads to temp directory
-def download_track(url):
-    path = str(raw_input('Save Path (blank for default):\n> '))
-
+def download_track(url, path=''):
     if path == '':   # default
         path = default_path
 
@@ -115,9 +113,10 @@ def main():
     # Query
     print '\nInput Query:\n' \
           ' URL (valid if url to youtube or soundcloud track/playlist/set)\n' \
-          ' Link File (a path to a .tx containing valid URLs)\n' \
+          ' Link File (a path to a .txt containing valid URLs)\n' \
           ' Search (songname/lyrics/artist or other)\n'
     query = str(raw_input('Query:\n> '))
+    path = str(raw_input('Save Path (blank for default):\n> '))
 
     # Playlist
     if '.txt' in query:     # must be txt file with link per line
@@ -135,17 +134,15 @@ def main():
             print 'No results found matching your query.'
             sys.exit()
 
-        print "Found:", '\n'.join(list_movies(available))
+        print "Search Results:"
+        print '\n'.join(list_movies(available))
         choice = ''                     # pick choice
         while choice.strip() == '':
             choice = raw_input('Pick one: ')
-
             title, video_link = available[int(choice)]
-            download_track('http://www.youtube.com/' + video_link)
-
+            download_track('http://www.youtube.com/' + video_link, path)
 
     print '\nFinished!'
 
 if __name__ == '__main__':
     main()
-
