@@ -1,4 +1,3 @@
-#usr/bin/python
 # TODO setup.py
 # TODO add config file in setup that allows path to be set
 # TODO batch option (see -a ytdl opt)
@@ -14,6 +13,7 @@ import re
 import sys
 import subprocess
 import shutil
+import praw
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from urllib import quote_plus
@@ -42,7 +42,9 @@ def download_playlist(playlist):
 
 
 # Downloads to temp directory
-def download_track(url, path=''):
+def download_track(url):
+    path = str(raw_input('Save Path (blank for default):\n> '))
+
     if path == '':   # default
         path = default_path
 
@@ -64,6 +66,16 @@ def download_track(url, path=''):
     # TODO print '[saved] %s' % trackname
     subprocess.call(command)
 
+def download_reddit(sub, links):
+    # get submisisons from reddit
+    count = 0
+    r = praw.Reddit(user_agent='Playlist Builder')
+    for post in r.get_subreddit(sub).get_hot(limit = links):
+        if (count > int(links)):
+            print "Downloaded %d links" % count
+            sys.exit("Done...")
+        download_track(str(post.url))
+        count += 1
 
 # TODO delete this when you have a way to extract track names
 # def process_track(tmp, path):
@@ -115,9 +127,9 @@ def main():
     print '\nInput Query:\n' \
           ' URL (valid if url to youtube or soundcloud track/playlist/set)\n' \
           ' Link File (a path to a .txt containing valid URLs)\n' \
+          ' Type reddit to pull tracks from a subreddit' \
           ' Search (songname/lyrics/artist or other)\n'
     query = str(raw_input('Query:\n> '))
-    path = str(raw_input('Save Path (blank for default):\n> '))
 
     # Playlist
     if '.txt' in query:     # must be txt file with link per line
@@ -126,6 +138,13 @@ def main():
     # Track
     elif valid_url(query):      # single track
         download_track(query)
+
+   # Reddit Playlist
+    elif 'reddit'  in query:     # must be txt file with link per line
+        sub = str(raw_input('Subreddit ? \n> '))
+        query = str(raw_input('Query:\n> '))
+        links = str(raw_input('How Many? \n> '))
+        download_reddit(sub, links)
 
     # Search
     else:
@@ -141,7 +160,7 @@ def main():
         while choice.strip() == '':
             choice = raw_input('Pick one: ')
             title, video_link = available[int(choice)]
-            download_track('http://www.youtube.com/' + video_link, path)
+            download_track('http://www.youtube.com/' + video_link)
 
     print '\nFinished!'
 
