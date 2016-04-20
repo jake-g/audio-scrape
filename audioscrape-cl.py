@@ -5,6 +5,7 @@ __author__ = 'jake'
 import re
 import sys
 import subprocess
+import praw
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from urllib import quote_plus
@@ -13,17 +14,18 @@ from urllib import quote_plus
 # Defaults
 default_playlist = 'urls.txt'
 default_path = '/Users/jake/Google Drive/Music/Dj/unsorted/'
+reddit_cache = '/Users/jake/Music/reddit_cache'
+
 
 def download_playlist(playlist):
+    # must be txt file with link per line
     print 'Downloading List...\n'
     with open(playlist) as f:
         urls = [urls.strip() for urls in f]
         count = len(urls)
-        current = 1
-        for url in urls:
-            print '(file %d/%d)' % (current, count)
-            download_track(url)
-            current += 1
+        for i, url in enumerate(urls):
+            print '(file %d/%d)' % (i, count)
+            download_track(i)
 
 
 # Downloads to temp directory
@@ -43,6 +45,20 @@ def download_track(url, path=''):
         url ]
 
     subprocess.call(command)
+
+
+def download_reddit(sub, links):
+    # get submisisons from reddit
+    count = 0
+    r = praw.Reddit(user_agent='Playlist Builder')
+    for post in r.get_subreddit(sub).get_hot(limit=links):
+        link = str(post.url)
+        if 'youtu' in link or 'soundc' in link:
+            download_track(link, reddit_cache)
+            count += 1
+        if (count > int(links) - 1):
+            print "Downloaded %d links" % count
+            sys.exit("Done...")
 
 
 def valid_url(url):
@@ -69,25 +85,7 @@ def list_movies(movies):
         yield '[{}] {}'.format(idx, title)
 
 
-def search_videos(query):
-    print 'Searching...'
-    response = urlopen('https://www.youtube.com/results?search_query=' + query)
-    return extract_videos(response.read())
-
-
-def main():
-    query = sys.argv[1]
-
-    # Playlist
-    if '.txt' in query:     # must be txt file with link per line
-        download_playlist(query)
-
-    # Track
-    elif valid_url(query):      # single track
-        download_track(query)
-
-    # Search
-    else:
+def process_search(query):
         search = quote_plus(query)
         available = search_videos(search)
         if not available:
@@ -96,11 +94,27 @@ def main():
 
         print "Search Results:"
         print '\n'.join(list_movies(available))
-        choice = ''                     # pick choice
+        choice = ''    # pick choice
         while choice.strip() == '':
             choice = raw_input('Pick one: ')
             title, video_link = available[int(choice)]
-            download_track('http://www.youtube.com/' + video_link, path)
+            download_track('http://www.youtube.com/' + video_link)
+
+
+def search_videos(query):
+    print 'Searching...'
+    response = urlopen('https://www.youtube.com/results?search_query=' + query)
+    return extract_videos(response.read())
+
+# TODO add arg parser
+def main():
+    query = sys.argv[1]
+    if valid_url(query):            # track
+        download_track(query)
+    elif '.txt' in query:           # playlist
+        download_playlist(query)
+    else:
+        process_search(query)       # search
 
     print 'Finished'
 
