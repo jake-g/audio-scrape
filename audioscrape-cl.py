@@ -1,32 +1,18 @@
-#usr/bin/python
-# TODO setup.py
-# TODO add config file in setup that allows path to be set
-# TODO batch option (see -a ytdl opt)
-# TODO support youtube-dl -U to update command
-# TODO run thru beet tag (use --exec CMD ytdl)
-# TODO if in playlist, then add this to tag: %(playlist_title)s-%(playlist_index)s
-# TODO Spotify playlist
+#!/usr/local/bin/python
 __author__ = 'jake'
 
 
 import re
 import sys
 import subprocess
-import praw
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from urllib import quote_plus
-
-# TODO use extract to name inputed url from audio-crape original download
-# TODO have it return playlists
-# TODO Soundcloud searching too
 
 
 # Defaults
 default_playlist = 'urls.txt'
 default_path = '/Users/jake/Google Drive/Music/Dj/unsorted/'
-reddit_cache = '/Users/jake/Music/reddit_cache'
-
 
 def download_playlist(playlist):
     print 'Downloading List...\n'
@@ -45,7 +31,7 @@ def download_track(url, path=''):
     if path == '':   # default
         path = default_path
 
-    print 'Downloading...\n'
+    print 'Downloading...'
     print '[url] %s' % url
     print '[path] %s' % path
 
@@ -56,22 +42,7 @@ def download_track(url, path=''):
         '-o', path + '%(title)s.%(ext)s',    # output path
         url ]
 
-    # TODO print '[saved] %s' % trackname
     subprocess.call(command)
-
-
-def download_reddit(sub, links):
-    # get submisisons from reddit
-    count = 0
-    r = praw.Reddit(user_agent='Playlist Builder')
-    for post in r.get_subreddit(sub).get_hot(limit=links):
-        link = str(post.url)
-        if 'youtu' in link or 'soundc' in link:
-            download_track(link, reddit_cache)
-            count += 1
-        if (count > int(links) - 1):
-            print "Downloaded %d links" % count
-            sys.exit("Done...")
 
 
 def valid_url(url):
@@ -84,6 +55,7 @@ def valid_url(url):
         r'(?::\d+)?'  # optional port
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)
     return url is not None and regex.search(url)
+
 
 def extract_videos(html):
     soup = BeautifulSoup(html, 'html.parser')
@@ -102,15 +74,9 @@ def search_videos(query):
     response = urlopen('https://www.youtube.com/results?search_query=' + query)
     return extract_videos(response.read())
 
-def main():
 
-    # Query
-    print '\nInput Query:\n' \
-          ' URL (valid if url to youtube or soundcloud track/playlist/set)\n' \
-          ' Link File (a path to a .txt containing valid URLs)\n' \
-          ' Search (songname/lyrics/artist or other)\n'
-    query = str(raw_input('Query:\n> '))
-    path = str(raw_input('Save Path (blank for default):\n> '))
+def main():
+    query = sys.argv[1]
 
     # Playlist
     if '.txt' in query:     # must be txt file with link per line
@@ -119,12 +85,6 @@ def main():
     # Track
     elif valid_url(query):      # single track
         download_track(query)
-
-   # Reddit Playlist
-    elif 'reddit'  in query:     # must be txt file with link per line
-        sub = str(raw_input('Subreddit ? \n> '))
-        links = str(raw_input('How Many? \n> '))
-        download_reddit(sub, links)
 
     # Search
     else:
@@ -142,7 +102,7 @@ def main():
             title, video_link = available[int(choice)]
             download_track('http://www.youtube.com/' + video_link, path)
 
-    print '\nFinished!'
+    print 'Finished'
 
 if __name__ == '__main__':
     main()
