@@ -1,0 +1,5 @@
+old/
+old/*
+.idea/
+*.pyc
+*.DS_Store
