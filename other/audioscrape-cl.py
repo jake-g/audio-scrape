@@ -1,28 +1,19 @@
 #!/usr/local/bin/python
+__author__ = 'jake'
 
 import re
 import sys
 import subprocess
-import praw
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from urllib import quote_plus
 
 
-# TODO setup.py
-# TODO Spotify search playlist, song, album
-# TODO Soundcloud searching too
-
-
 # Defaults
-# TODO add config file in setup that allows this to be set
 default_playlist = 'urls.txt'
 default_path = '/Users/jake/Google Drive/Music/Dj/unsorted/'
-reddit_cache = '/Users/jake/Music/reddit_cache'
-
 
 def download_playlist(playlist):
-    # TODO if in playlist, then add this to tag: %(playlist_title)s-%(playlist_index)s
     # must be txt file with link per line
     print 'Downloading List...\n'
     with open(playlist) as f:
@@ -33,6 +24,7 @@ def download_playlist(playlist):
             download_track(i)
 
 
+# Downloads to temp directory
 def download_track(url, path=''):
     if path == '':   # default
         path = default_path
@@ -46,31 +38,18 @@ def download_track(url, path=''):
         '-x', '-f bestaudio/best',      # best quality audio
         '--embed-thumbnail',            # embed art
         '-o', path + '%(title)s.%(ext)s',    # output path
-        url]
+        url ]
 
     subprocess.call(command)
-
-
-def download_reddit(sub, links):
-    count = 0
-    r = praw.Reddit(user_agent='Playlist Builder')
-    for post in r.get_subreddit(sub).get_hot(limit=links):
-        link = str(post.url)
-        if 'youtu' in link or 'soundc' in link:
-            download_track(link, reddit_cache)
-            count += 1
-        if count > int(links) - 1:
-            print "Downloaded %d links" % count
-            sys.exit("Done...")
 
 
 def valid_url(url):
     import re
     regex = re.compile(
         r'^https?://'  # http:// or https://
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain
-        r'localhost|'
-        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ip
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
+        r'localhost|'  # localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})' # ...or ip
         r'(?::\d+)?'  # optional port
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)
     return url is not None and regex.search(url)
@@ -110,25 +89,8 @@ def search_videos(query):
     return extract_videos(response.read())
 
 
-def help_text():
-    print '\nInput Query:\n' \
-          ' URL (valid if url to youtube or soundcloud track/playlist/set)\n' \
-          ' Link File (a path to a .txt containing valid URLs)\n' \
-          ' Search (songname/lyrics/artist or other)\n' \
-          ' Type reddit to browse by subreddit\n'
-
-
 def main():
-    # TODO add arg parser arg: choose path, help, reddit, update (praw and youtubedl)
-
-    # Get Query
-    if len(sys.argv) == 2:          # input argument
-        query = sys.argv[1]
-    else:                           # ask for input
-        help_text()
-        query = str(raw_input('Query:\n> '))
-
-    # Process Query
+    query = sys.argv[1]
     if valid_url(query):            # track
         download_track(query)
     elif '.txt' in query:           # playlist
@@ -136,7 +98,7 @@ def main():
     else:
         process_search(query)       # search
 
+    print 'Finished'
 
 if __name__ == '__main__':
     main()
-    print 'Done'
