@@ -1,9 +1,11 @@
 #!/usr/local/bin/python
 __author__ = 'jake'
 
+
 import re
 import sys
 import subprocess
+import praw
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from urllib import quote_plus
@@ -12,6 +14,8 @@ from urllib import quote_plus
 # Defaults
 default_playlist = 'urls.txt'
 default_path = '/Users/jake/Google Drive/Music/Dj/unsorted/'
+reddit_cache = '/Users/jake/Music/reddit_cache'
+
 
 def download_playlist(playlist):
     # must be txt file with link per line
@@ -41,6 +45,20 @@ def download_track(url, path=''):
         url ]
 
     subprocess.call(command)
+
+
+def download_reddit(sub, links):
+    # get submisisons from reddit
+    count = 0
+    r = praw.Reddit(user_agent='Playlist Builder')
+    for post in r.get_subreddit(sub).get_hot(limit=links):
+        link = str(post.url)
+        if 'youtu' in link or 'soundc' in link:
+            download_track(link, reddit_cache)
+            count += 1
+        if (count > int(links) - 1):
+            print "Downloaded %d links" % count
+            sys.exit("Done...")
 
 
 def valid_url(url):
@@ -88,7 +106,7 @@ def search_videos(query):
     response = urlopen('https://www.youtube.com/results?search_query=' + query)
     return extract_videos(response.read())
 
-
+# TODO add arg parser
 def main():
     query = sys.argv[1]
     if valid_url(query):            # track

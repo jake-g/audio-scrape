@@ -1,13 +1,14 @@
 #!/usr/local/bin/python
+from __future__ import unicode_literals
 
 import re
 import sys
-import subprocess
-import praw
+import youtube_dl
+import os
+import eyed3
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from urllib import quote_plus
-
 
 # TODO setup.py
 # TODO Spotify search playlist, song, album
@@ -18,7 +19,18 @@ from urllib import quote_plus
 # TODO add config file in setup that allows this to be set
 default_playlist = 'urls.txt'
 default_path = '/Users/jake/Google Drive/Music/Dj/unsorted/'
-reddit_cache = '/Users/jake/Music/reddit_cache'
+
+
+class logger(object):
+    def debug(self, msg):
+        pass
+
+    def warning(self, msg):
+        print(msg)
+        pass
+
+    def error(self, msg):
+        print(msg)
 
 
 def download_playlist(playlist):
@@ -33,35 +45,51 @@ def download_playlist(playlist):
             download_track(i)
 
 
-def download_track(url, path=''):
-    if path == '':   # default
-        path = default_path
+def download_track(url, path=default_path):
+    # Settings for youtube-dl
+    dl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': path + '%(title)s.%(ext)s',
+        'writethumbnail': True,
+        'postprocessors': [
+            {
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '320'
+            },
+            # {
+            #     'key': 'MetadataFromTitle',
+            #     'titleformat': "%(artist)s - %(title)s"
+            # },
+            {
+                'key': 'EmbedThumbnail',
+                'already_have_thumbnail': False
+            }
+        ],
+        'logger': logger(),
+        'progress_hooks': [hook],
+    }
+    with youtube_dl.YoutubeDL(dl_opts) as ydl:
+        ydl.download([url])
 
-    print 'Downloading...'
-    print '[url] %s' % url
-    print '[path] %s' % path
 
-    command = [
-        'youtube-dl',                   # command
-        '-x', '-f bestaudio/best',      # best quality audio
-        '--embed-thumbnail',            # embed art
-        '-o', path + '%(title)s.%(ext)s',    # output path
-        url]
+# Fills id3 metadate based off filename
+def tag_file(filename):
+    [path, filename] = os.path.split(filename)
+    [filename, ext] = os.path.splitext(filename)
+    artist, title = filename.split(" - ")
+    audiofile = eyed3.load(filename)
+    audiofile.tag.artist = unicode(artist)
+    audiofile.tag.album_artist = unicode(artist)
+    audiofile.tag.title = unicode(title)
+    audiofile.tag.save()
+    return [artist, title]
 
-    subprocess.call(command)
-
-
-def download_reddit(sub, links):
-    count = 0
-    r = praw.Reddit(user_agent='Playlist Builder')
-    for post in r.get_subreddit(sub).get_hot(limit=links):
-        link = str(post.url)
-        if 'youtu' in link or 'soundc' in link:
-            download_track(link, reddit_cache)
-            count += 1
-        if count > int(links) - 1:
-            print "Downloaded %d links" % count
-            sys.exit("Done...")
+# Callback for youtube-dl
+def hook(d):
+    if d['status'] == 'finished':
+        [artist, title] = tag_file(d[u'filename'])
+        print'Saved : %s by %s (%s)' % (title, artist, d[u'_total_bytes_str'])
 
 
 def valid_url(url):
@@ -89,19 +117,19 @@ def list_movies(movies):
 
 
 def process_search(query):
-        search = quote_plus(query)
-        available = search_videos(search)
-        if not available:
-            print 'No results found matching your query.'
-            sys.exit()
+    search = quote_plus(query)
+    available = search_videos(search)
+    if not available:
+        print 'No results found matching your query.'
+        sys.exit()
 
-        print "Search Results:"
-        print '\n'.join(list_movies(available))
-        choice = ''    # pick choice
-        while choice.strip() == '':
-            choice = raw_input('Pick one: ')
-            title, video_link = available[int(choice)]
-            download_track('http://www.youtube.com/' + video_link)
+    print "Search Results:"
+    print '\n'.join(list_movies(available))
+    choice = ''  # pick choice
+    while choice.strip() == '':
+        choice = raw_input('Pick one: ')
+        title, video_link = available[int(choice)]
+        download_track('http://www.youtube.com/' + video_link)
 
 
 def search_videos(query):
@@ -122,21 +150,22 @@ def main():
     # TODO add arg parser arg: choose path, help, reddit, update (praw and youtubedl)
 
     # Get Query
-    if len(sys.argv) == 2:          # input argument
+    if len(sys.argv) == 2:  # input argument
         query = sys.argv[1]
-    else:                           # ask for input
+    else:  # ask for input
         help_text()
         query = str(raw_input('Query:\n> '))
 
     # Process Query
-    if valid_url(query):            # track
+    if valid_url(query):  # track
         download_track(query)
-    elif '.txt' in query:           # playlist
+    elif '.txt' in query:  # playlist
         download_playlist(query)
     else:
-        process_search(query)       # search
+        process_search(query)  # search
+
+    print 'Finished...'
 
 
 if __name__ == '__main__':
     main()
-    print 'Done'
