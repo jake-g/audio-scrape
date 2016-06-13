@@ -55,7 +55,7 @@ def download_track(url, path=default_path):
             {
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
-                'preferredquality': '320'
+                'preferredquality': '0'
             },
             {
                 'key': 'EmbedThumbnail',
@@ -73,6 +73,7 @@ def download_track(url, path=default_path):
 
 # Fills id3 metadate based off filename
 def tag_file(filename):
+    # TODO most tracks arent tagged right!!
     path, filename = os.path.split(filename)
     name, ext = os.path.splitext(filename)
     try:
