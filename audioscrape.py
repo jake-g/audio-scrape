@@ -2,105 +2,65 @@
 from __future__ import unicode_literals
 
 import re
+import subprocess
 import sys
-import youtube_dl
-import os
-import eyed3
-from bs4 import BeautifulSoup
-from urllib2 import urlopen
 from urllib import quote_plus
+from urllib2 import urlopen
+
+from bs4 import BeautifulSoup
 
 # TODO setup.py
-# TODO Spotify search playlist, song, album
 # TODO Soundcloud searching too
+# TODO add config file in setup that allows this to be set
 
 
 # Defaults
-# TODO add config file in setup that allows this to be set
-default_playlist = 'urls.txt'
-default_path = '/Users/jake/Google Drive/Music/Dj/unsorted/'
-reddit_cache = './reddit_cache/'
-
-
-class logger(object):
-    def debug(self, msg):
-        pass
-
-    def warning(self, msg):
-        pass
-
-    def error(self, msg):
-        print(msg)
-
+default_path = '/Users/jake/Google Drive/Music/Dj/'
 
 def download_playlist(playlist):
-    # TODO if in playlist, then add this to tag: %(playlist_title)s-%(playlist_index)s
-    # must be txt file with link per line
     print 'Downloading List...\n'
     with open(playlist) as f:
         urls = [urls.strip() for urls in f]
         count = len(urls)
         for i, url in enumerate(urls):
-            print '(file %d/%d)' % (i, count)
-            download_track(i)
+            print '\n(file %d/%d)' % (i, count)
+            download_track(url)
 
 
 def download_track(url, path=default_path):
-    # Settings for youtube-dl
-    dl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': path + '%(title)s.%(ext)s',
-        'writethumbnail': True,
-        'postprocessors': [
-            {
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '0'
-            },
-            {
-                'key': 'EmbedThumbnail',
-                'already_have_thumbnail': False
-            }
-        ],
-        'logger': logger(),
-        'progress_hooks': [hook],
-    }
-    with youtube_dl.YoutubeDL(dl_opts) as ydl:
-        ydl.download([url])
-        # filename, path = tag_file(FILE)
-        # print'Saved : %s to %s [%s]' % (filename, path, SIZE)
+    dl_options = \
+    ['youtube-dl',
+     'extract-audio',
+     'audio-format mp3',
+     'embed-thumbnail',
+     'add-metadata',
+     'metadata-from-title "%(artist)s - %(title)s"',
+     'audio-quality 0',
+     'output']
+
+    filename = "'" + path + "%(title)s.%(ext)s" + "'"
+    if 'soundcloud.com' in url:
+        dl_options[5] = 'metadata-from-title "%(uploader)s - %(title)s"'
+
+    cmd = ' --'.join(dl_options)
+    proc = subprocess.Popen(' '.join([cmd, filename, url]), shell=True, stdout=subprocess.PIPE)
+    print_status(proc)
 
 
-# Fills id3 metadate based off filename
-def tag_file(filename):
-    # TODO most tracks arent tagged right!!
-    path, filename = os.path.split(filename)
-    name, ext = os.path.splitext(filename)
-    try:
-        artist, title = name.split(" - ")
-    except:  # title format not artist - title
-        artist = ''
-        title = name
-    filename = path + '/' + name + '.mp3'
-    audiofile = eyed3.load(filename)
-    audiofile.tag.artist = unicode(artist)
-    audiofile.tag.album_artist = unicode(artist)
-    audiofile.tag.title = unicode(title)
-    audiofile.tag.save()
-    return [filename, path]
-
-
-def hook(d):
-    if d['status'] == 'finished':
-        filename, path = tag_file(d[u'filename'])
-        print'[Saved %s] %s' % (d[u'_total_bytes_str'], filename)
+def print_status(proc):
+    while not proc.poll():
+        status = proc.stdout.readline()
+        if status:
+            sys.stdout.write(status)
+        else:
+            break
 
 
 def valid_url(url):
     import re
     regex = re.compile(
         r'^https?://'  # http:// or https://
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'
         r'localhost|'
         r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ip
         r'(?::\d+)?'  # optional port
@@ -146,12 +106,10 @@ def help_text():
     print '\nInput Query:\n' \
           ' URL (valid if url to youtube or soundcloud track/playlist/set)\n' \
           ' Link File (a path to a .txt containing valid URLs)\n' \
-          ' Search (songname/lyrics/artist or other)\n' \
-          ' Type reddit to browse by subreddit\n'
+          ' Search (songname/lyrics/artist or other)\n'
 
 
 def main():
-    # TODO add arg parser arg: choose path, help, reddit, update (praw and youtubedl)
 
     # Get Query
     if len(sys.argv) == 2:  # input argument
