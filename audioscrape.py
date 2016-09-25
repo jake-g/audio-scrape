@@ -5,7 +5,6 @@ import re
 import sys
 import youtube_dl
 import os
-import eyed3
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from urllib import quote_plus
@@ -16,25 +15,47 @@ from urllib import quote_plus
 
 
 # Defaults
-# TODO add config file in setup that allows this to be set
-default_playlist = 'urls.txt'
-default_path = '/Users/jake/Google Drive/Music/Dj/unsorted/'
-reddit_cache = './reddit_cache/'
+default_path = '/Users/jake/Google Drive/Music/Dj/tst/'
+# Settings for youtube-dl
+dl_opts = {
+    'format': 'bestaudio/best',
+    'outtmpl': default_path + '%(title)s.%(ext)s',
+    'writethumbnail': True,
+    'postprocessors': [
+        {
+            'key': 'MetadataFromTitle',
+            'titleformat': "%(artist)s - %(title)s"
+        },
+        {
+            'key': 'FFmpegMetadata',
+        },
+        {
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '0'
+        },
+        {
+            'key': 'EmbedThumbnail',
+            'already_have_thumbnail': False
+        }
+    ]
+}
 
 
 class logger(object):
     def debug(self, msg):
-        pass
+        # pass
+        print(msg)
 
     def warning(self, msg):
-        pass
+        # pass
+        print(msg)
 
     def error(self, msg):
         print(msg)
 
 
 def download_playlist(playlist):
-    # TODO if in playlist, then add this to tag: %(playlist_title)s-%(playlist_index)s
     # must be txt file with link per line
     print 'Downloading List...\n'
     with open(playlist) as f:
@@ -45,55 +66,34 @@ def download_playlist(playlist):
             download_track(i)
 
 
-def download_track(url, path=default_path):
-    # Settings for youtube-dl
-    dl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': path + '%(title)s.%(ext)s',
-        'writethumbnail': True,
-        'postprocessors': [
-            {
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '0'
-            },
-            {
-                'key': 'EmbedThumbnail',
-                'already_have_thumbnail': False
-            }
-        ],
-        'logger': logger(),
-        'progress_hooks': [hook],
-    }
+def download_track(url):
+    dl_opts[u'logger'] = logger()
+    dl_opts[u'progress_hooks'] = [hook]
+    if 'soundcloud.com' in url:
+        dl_opts[u'postprocessors'][0][u'titleformat'] = "%(uploader)s - %(title)s"
+
     with youtube_dl.YoutubeDL(dl_opts) as ydl:
         ydl.download([url])
-        # filename, path = tag_file(FILE)
-        # print'Saved : %s to %s [%s]' % (filename, path, SIZE)
-
-
-# Fills id3 metadate based off filename
-def tag_file(filename):
-    # TODO most tracks arent tagged right!!
-    path, filename = os.path.split(filename)
-    name, ext = os.path.splitext(filename)
-    try:
-        artist, title = name.split(" - ")
-    except:  # title format not artist - title
-        artist = ''
-        title = name
-    filename = path + '/' + name + '.mp3'
-    audiofile = eyed3.load(filename)
-    audiofile.tag.artist = unicode(artist)
-    audiofile.tag.album_artist = unicode(artist)
-    audiofile.tag.title = unicode(title)
-    audiofile.tag.save()
-    return [filename, path]
 
 
 def hook(d):
     if d['status'] == 'finished':
-        filename, path = tag_file(d[u'filename'])
-        print'[Saved %s] %s' % (d[u'_total_bytes_str'], filename)
+        path, artist, track, ext, size = get_info(d)
+        print '[saved]'
+        print '\tartist:\t', artist
+        print '\ttrack:\t', track
+        print '\text:\t', ext
+        print '\tsize:\t', size
+        print '\tpath:\t', path
+
+
+def get_info(data):
+    # use with hook
+    size = data[u'_total_bytes_str']
+    path, filename = os.path.split(data[u'filename'])
+    artist, name = filename.split(' - ')
+    track, ext = name.split('.')
+    return [path, artist, track, ext, size]
 
 
 def valid_url(url):
@@ -158,7 +158,9 @@ def main():
         query = sys.argv[1]
     else:  # ask for input
         help_text()
-        query = str(raw_input('Query:\n> '))
+        # query = str(raw_input('Query:\n> '))
+        # query = 'https://youtu.be/szTrH6XgA_M'
+        query = 'https://soundcloud.com/thissoundgoesaround/50-cent-many-men-tnv-reflip'
 
     # Process Query
     if valid_url(query):  # track
