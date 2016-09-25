@@ -5,9 +5,11 @@ import re
 import sys
 import youtube_dl
 import os
+import signal
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from urllib import quote_plus
+
 
 # TODO setup.py
 # TODO Spotify search playlist, song, album
@@ -15,7 +17,7 @@ from urllib import quote_plus
 
 
 # Defaults
-default_path = '/Users/jake/Google Drive/Music/Dj/tst/'
+default_path = '/Users/jake/Google Drive/Music/Dj/scraped/'
 # Settings for youtube-dl
 dl_opts = {
     'format': 'bestaudio/best',
@@ -44,8 +46,8 @@ dl_opts = {
 
 class logger(object):
     def debug(self, msg):
-        # pass
-        print(msg)
+        pass
+        # print(msg)
 
     def warning(self, msg):
         # pass
@@ -62,8 +64,14 @@ def download_playlist(playlist):
         urls = [urls.strip() for urls in f]
         count = len(urls)
         for i, url in enumerate(urls):
-            print '(file %d/%d)' % (i, count)
-            download_track(i)
+            print '\n(line %d/%d)' % (i, count)
+            print '[url]', url
+            if '#' in url:
+                pass
+            try:
+                download_track(str(url))
+            except:
+                pass
 
 
 def download_track(url):
@@ -107,6 +115,9 @@ def valid_url(url):
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)
     return url is not None and regex.search(url)
 
+def quit_handler(signum, frame):
+    print 'Terminating...'
+    os._exit(0)
 
 def extract_videos(html):
     soup = BeautifulSoup(html, 'html.parser')
@@ -152,6 +163,7 @@ def help_text():
 
 def main():
     # TODO add arg parser arg: choose path, help, reddit, update (praw and youtubedl)
+    signal.signal(signal.SIGINT, quit_handler)
 
     # Get Query
     if len(sys.argv) == 2:  # input argument
