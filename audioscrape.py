@@ -1,35 +1,33 @@
 #!/usr/local/bin/python
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
+import argparse
 import re
 import sys
-import youtube_dl
-import os
-import signal
-from bs4 import BeautifulSoup
-from urllib2 import urlopen
 from urllib import quote_plus
+from urllib2 import urlopen
 
+import youtube_dl
+from bs4 import BeautifulSoup
 
-# TODO setup.py
-# TODO Spotify search playlist, song, album
-# TODO Soundcloud searching too
-
+# hack for osx
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 # Defaults
-default_path = '/Users/jake/Google Drive/Music/Dj/scraped/'
+PATH = '/Users/jake/Desktop/'
+VERBOSITY = 0
+
 # Settings for youtube-dl
 dl_opts = {
     'format': 'bestaudio/best',
-    'outtmpl': default_path + '%(title)s.%(ext)s',
+    'forcejson': True,
+    'outtmpl': PATH + '%(title)s.%(ext)s',
     'writethumbnail': True,
     'postprocessors': [
         {
             'key': 'MetadataFromTitle',
             'titleformat': "%(artist)s - %(title)s"
-        },
-        {
-            'key': 'FFmpegMetadata',
         },
         {
             'key': 'FFmpegExtractAudio',
@@ -46,11 +44,11 @@ dl_opts = {
 
 class logger(object):
     def debug(self, msg):
+        if VERBOSITY > 0:
+            print(msg)
         pass
-        # print(msg)
 
     def warning(self, msg):
-        # pass
         print(msg)
 
     def error(self, msg):
@@ -59,49 +57,35 @@ class logger(object):
 
 def download_playlist(playlist):
     # must be txt file with link per line
-    print 'Downloading List...\n'
+    print('Downloading List...\n')
     with open(playlist) as f:
         urls = [urls.strip() for urls in f]
         count = len(urls)
         for i, url in enumerate(urls):
-            print '\n(line %d/%d)' % (i, count)
-            print '[url]', url
-            if '#' in url:
-                pass
+            print('\n(line %d/%d)' % (i, count))
+            print('[url]', url)
             try:
-                download_track(str(url))
+                if '#' not in url:
+                    download_track(str(url))
             except:
                 pass
 
 
 def download_track(url):
     dl_opts[u'logger'] = logger()
-    dl_opts[u'progress_hooks'] = [hook]
+    dl_opts[u'progress_hooks'] = [callback]
+    print('[\033[91mFetching\033[00m] %s\n' % url)
     if 'soundcloud.com' in url:
         dl_opts[u'postprocessors'][0][u'titleformat'] = "%(uploader)s - %(title)s"
-
     with youtube_dl.YoutubeDL(dl_opts) as ydl:
         ydl.download([url])
 
 
-def hook(d):
+def callback(d):
+    # pprint.pprint(d)
+
     if d['status'] == 'finished':
-        path, artist, track, ext, size = get_info(d)
-        print '[saved]'
-        print '\tartist:\t', artist
-        print '\ttrack:\t', track
-        print '\text:\t', ext
-        print '\tsize:\t', size
-        print '\tpath:\t', path
-
-
-def get_info(data):
-    # use with hook
-    size = data[u'_total_bytes_str']
-    path, filename = os.path.split(data[u'filename'])
-    artist, name = filename.split(' - ')
-    track, ext = name.split('.')
-    return [path, artist, track, ext, size]
+        print('\x1b[1A[\033[92mSaving\033[00m] %s' % (d[u'filename']))
 
 
 def valid_url(url):
@@ -115,64 +99,57 @@ def valid_url(url):
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)
     return url is not None and regex.search(url)
 
-def quit_handler(signum, frame):
-    print 'Terminating...'
-    os._exit(0)
 
-def extract_videos(html):
+def extract_links(html):
     soup = BeautifulSoup(html, 'html.parser')
     pattern = re.compile(r'/watch\?v=')
     found = soup.find_all('a', 'yt-uix-tile-link', href=pattern)
     return [(x.text.encode('utf-8'), x.get('href')) for x in found]
 
 
-def list_movies(movies):
-    for idx, (title, _) in enumerate(movies):
+def list_links(links):
+    for idx, (title, _) in enumerate(links):
         yield '[{}] {}'.format(idx, title)
 
 
 def process_search(query):
     search = quote_plus(query)
-    available = search_videos(search)
+    available = search_youtube(search)
     if not available:
-        print 'No results found matching your query.'
+        print('No results found matching your query.')
         sys.exit()
 
-    print "Search Results:"
-    print '\n'.join(list_movies(available))
+    print("Search Results:")
+    print('\n'.join(list_links(available)))
     choice = ''  # pick choice
     while choice.strip() == '':
         choice = raw_input('Pick one: ')
+        print('')
         title, video_link = available[int(choice)]
         download_track('http://www.youtube.com/' + video_link)
 
 
-def search_videos(query):
-    print 'Searching...'
+def search_youtube(query):
+    print('Searching...')
     response = urlopen('https://www.youtube.com/results?search_query=' + query)
-    return extract_videos(response.read())
+    return extract_links(response.read())
 
 
 def help_text():
-    print '\nInput Query:\n' \
+    print('\nInput Query:\n' \
           ' URL (valid if url to youtube or soundcloud track/playlist/set)\n' \
           ' Link File (a path to a .txt containing valid URLs)\n' \
-          ' Search (songname/lyrics/artist or other)\n' \
-          ' Type reddit to browse by subreddit\n'
+          ' Search (songname/lyrics/artist or other)\n')
 
 
-def main():
-    # TODO add arg parser arg: choose path, help, reddit, update (praw and youtubedl)
-    signal.signal(signal.SIGINT, quit_handler)
-
+def main(args):
     # Get Query
-    if len(sys.argv) == 2:  # input argument
-        query = sys.argv[1]
+    PATH = args.path
+    if args.link:  # input argument
+        query = args.link
     else:  # ask for input
         help_text()
-        # query = str(raw_input('Query:\n> '))
-        # query = 'https://youtu.be/szTrH6XgA_M'
-        query = 'https://soundcloud.com/thissoundgoesaround/50-cent-many-men-tnv-reflip'
+        query = str(raw_input('Query:\n> '))
 
     # Process Query
     if valid_url(query):  # track
@@ -184,5 +161,9 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-    print 'Done'
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--link", "-l", type=str, help="url to download")
+    parser.add_argument("--path", "-p", default=PATH, type=str, help="download path")
+    args = parser.parse_args()
+
+    main(args)
